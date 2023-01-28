@@ -113,7 +113,7 @@ export const ModalWrapper = ({children}: any) => {
         <div>{typeof resultModalProps?.body === 'function' ? resultModalProps?.body() : resultModalProps?.body }</div>
         <button 
         className='close-btn'
-        onClick={() => setResultModalProps(null)}>Close</button>
+        onClick={() => setResultModalProps(null)}>OK</button>
       </Modal>
     </>
   )
