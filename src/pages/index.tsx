@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import CloseIconSvg from '../../public/close-icon.svg';
 import SuccessIconSvg from '../../public/success-icon.svg';
 import ErrorIconSvg from '../../public/error-icon.svg';
@@ -10,10 +10,24 @@ interface ModalProps {
   allowOutsideClick?: boolean,
   hideCloseIcon?: boolean,
   onClose?: Function,
-  onConfirm?: Function,
-  onCancel?: Function,
   customModal?: boolean,
   children: JSX.Element | JSX.Element[]
+}
+
+interface ConfirmationModalProps {
+  body: string | JSX.Element,
+  confirmText: string,
+  rejectText: string
+}
+
+interface ResultModalProps {
+  body: string | JSX.Element,
+  type: 'success' | 'error'
+}
+
+interface ModalContextProps {
+  confirmationModalListener: Function,
+  setResultModalProps: React.Dispatch<ResultModalProps>
 }
 
 export const Modal = ({
@@ -23,8 +37,6 @@ export const Modal = ({
   allowOutsideClick,
   hideCloseIcon,
   onClose,
-  onConfirm,
-  onCancel,
   customModal,
   children
 }: ModalProps) => {
@@ -39,10 +51,10 @@ export const Modal = ({
             {!customModal ? 
             <div className='default-modal'>
               <div className='default-modal-header'>
-                {!hideCloseIcon && 
+                {!hideCloseIcon && onClose &&
                 <CloseIconSvg 
                 className='close-btn'
-                onClick={() => onClose && onClose()}/>}
+                onClick={() => onClose()}/>}
               </div>
               {type && 
               <div className='icon-container'>
@@ -55,14 +67,18 @@ export const Modal = ({
           <></>
 }
 
-export const ModalWrapper = ({children}: any) => {
-  const[showModal, toggleModal] = useState(false);
-  const[showConfirmationModal, toggleConfirmationModal] = useState(false);
-  const[showResultModal, toggleResultModal] = useState(false);
+const ModalContext = React.createContext<ModalContextProps>({
+  confirmationModalListener: () => {},
+  setResultModalProps: () => {}
+});
 
-  const confirmationModalListener = async () => {
+export const ModalWrapper = ({children}: any) => {
+  const[confirmationModalProps, setConfirmationModalProps] = useState<ConfirmationModalProps | any>(null);
+  const[resultModalProps, setResultModalProps] = useState<ResultModalProps | any>(null);
+
+  const confirmationModalListener = async (confirmationModalProps: any) => {
     return new Promise((resolve, reject) => {
-      toggleConfirmationModal(true);
+      setConfirmationModalProps(confirmationModalProps);
       setTimeout(() => {
         const confirmationBtn = document.querySelector('.confirm') as HTMLButtonElement;
         confirmationBtn.addEventListener('click', () => confirmationModalEvent(true, resolve));
@@ -73,59 +89,57 @@ export const ModalWrapper = ({children}: any) => {
   };
 
   const confirmationModalEvent = (resultType: boolean, resolve: any) => {
-    toggleConfirmationModal(false);
-    toggleResultModal(true);
-    setTimeout(() => {
-      const closeBtns = document.querySelectorAll('.close-btn');
-      Array.from(closeBtns).map(closeBtn => 
-      closeBtn?.addEventListener('click', () => {
-        toggleResultModal(false);
-        resolve(resultType);
-      }));
-    }, 500);
+    setConfirmationModalProps(false);
+    resolve(resultType);
   };
   
   return (
     <>
-      {React.cloneElement(children, { confirmationModalListener })}
+      <ModalContext.Provider value={{ confirmationModalListener, setResultModalProps }}>
+        {children}
+      </ModalContext.Provider>
       <Modal 
       customClass='confirmation-modal'
-      opened={showConfirmationModal}
-      onClose={() => toggleConfirmationModal(false)}>
-        <div>Tem certeza?</div>
-        <button className='confirm'>Confirm</button>
-        <button className='reject'>Reject</button>
+      opened={confirmationModalProps}
+      onClose={() => setConfirmationModalProps(null)}>
+        <div>{typeof confirmationModalProps?.body === 'function' ? confirmationModalProps?.body() : confirmationModalProps?.body }</div>
+        <button className='confirm'>{confirmationModalProps?.confirmText}</button>
+        <button className='reject'>{confirmationModalProps?.rejectText}</button>
       </Modal>
       <Modal 
       customClass='result-modal'
-      opened={showResultModal}
-      type={'success'}>
-        <div>Já é, brother!</div>
-        <button className='close-btn'>Close</button>
+      opened={resultModalProps}
+      type={resultModalProps?.type}>
+        <div>{typeof resultModalProps?.body === 'function' ? resultModalProps?.body() : resultModalProps?.body }</div>
+        <button 
+        className='close-btn'
+        onClick={() => setResultModalProps(null)}>Close</button>
       </Modal>
     </>
   )
 }
 
-export const Content = (props: any) => {
-
-  useEffect(() => {
-    console.log(props);
-  }, [])
-  
+export const Content = () => {
+  const { confirmationModalListener, setResultModalProps } = useContext(ModalContext);
 
   return (
     <div>
        <button onClick={async () => {
-          const response = await props.confirmationModalListener();
-          console.log(response);
+          const response = await confirmationModalListener({
+            body: <p>Eae? Qual vai ser, mermão?</p>,
+            confirmText: 'Aceitar',
+            rejectText: 'Recusar',
+          });
+          setResultModalProps({
+            type: response ? 'success' : 'error',
+            body: <p>Já é, brother!</p>
+          });
        }}>DELETE</button>
     </div>
   )
 }
 
 export default function Index() {
-  
   return (
     <ModalWrapper>
       <Content/>
